@@ -22,8 +22,7 @@ jobs:
           build-essential \
           gcc-arm-linux-gnueabihf \
           g++-arm-linux-gnueabihf \
-          binutils-arm-linux-gnueabihf \
-          pkg-config-arm-linux-gnueabihf
+          binutils-arm-linux-gnueabihf
 
     - name: Install ARM libraries
       run: |
