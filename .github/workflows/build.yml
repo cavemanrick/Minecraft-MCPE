@@ -37,37 +37,74 @@ jobs:
         cat > handheld/CMakeLists.txt << 'EOF'
         cmake_minimum_required(VERSION 3.10)
         project(Minecraft_MCPE_S905)
-        
+
         set(CMAKE_CXX_STANDARD 11)
         set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+        set(CMAKE_CXX_FLAGS_DEBUG "-g -O0")
+
+        # ARM-specific flags for S905 (Cortex-A9 with NEON)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv7-a -mfpu=neon -mtune=cortex-a9")
-        
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed")
+
         include_directories(
             ${CMAKE_CURRENT_SOURCE_DIR}/lib/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src
         )
-        
+
+        # Source files
         set(SOURCES
             src/client/renderer/Shader.cpp
             src/client/renderer/GLESLoader.cpp
             src/client/renderer/LevelRenderer.cpp
         )
-        
-        add_executable(minecraft_s905 src/main_emuelec_s905.h ${SOURCES})
-        target_link_libraries(minecraft_s905 SDL png EGL GLESv2 m)
-        EOF
 
-    - name: Build for S905
+        # Main executable
+        add_executable(minecraft_s905
+            src/main_emuelec_s905.h
+            ${SOURCES}
+        )
+
+        # Link libraries
+        target_link_libraries(minecraft_s905
+            SDL
+            png
+            EGL
+            GLESv2
+            m
+        )
+
+        # Compiler warnings
+        target_compile_options(minecraft_s905 PRIVATE -Wall -Wextra -Wpedantic)
+
+        # Install target
+        install(TARGETS minecraft_s905 DESTINATION bin)
+        EOF
+      working-directory: ./
+
+    - name: Create build directory
+      run: mkdir -p handheld/build
+
+    - name: Configure CMake for ARM S905
       run: |
-        mkdir -p handheld/build
         cd handheld/build
         cmake -DCMAKE_BUILD_TYPE=Release \
               -DCMAKE_SYSTEM_NAME=Linux \
               -DCMAKE_SYSTEM_PROCESSOR=armv7l \
               -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc \
               -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ \
+              -DCMAKE_FIND_ROOT_PATH=/usr/arm-linux-gnueabihf \
               ..
+
+    - name: Build for S905
+      run: |
+        cd handheld/build
         make -j$(nproc)
+
+    - name: Verify build artifact
+      run: |
+        ls -lh handheld/build/minecraft_s905
+        file handheld/build/minecraft_s905
+        arm-linux-gnueabihf-readelf -h handheld/build/minecraft_s905
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
@@ -81,6 +118,6 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: handheld/build/minecraft_s905
-        body: "Minecraft Pi Edition - EmuELEC S905 Mali GPU Port"
+        body: "Minecraft Pi Edition - EmuELEC S905 Mali GPU Port\n\n**Binary**: minecraft_s905 (ARM v7, 32-bit)\n\nSee README_EMUELEC_S905.md for installation and usage instructions."
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
