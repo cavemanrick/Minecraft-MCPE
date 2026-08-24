@@ -1,0 +1,87 @@
+name: Build Minecraft MCPE S905 ARM
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-arm:
+    runs-on: ubuntu-latest
+    
+    name: ARM S905 Cross-Compile
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install ARM cross-compile toolchain
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          gcc-arm-linux-gnueabihf \
+          g++-arm-linux-gnueabihf \
+          binutils-arm-linux-gnueabihf \
+          pkg-config-arm-linux-gnueabihf
+
+    - name: Install ARM libraries
+      run: |
+        sudo apt-get install -y \
+          libpng-dev:armhf \
+          libsdl1.2-dev:armhf \
+          libegl-dev:armhf \
+          libgles2-mesa-dev:armhf || true
+
+    - name: Create CMakeLists.txt
+      run: |
+        cat > handheld/CMakeLists.txt << 'EOF'
+        cmake_minimum_required(VERSION 3.10)
+        project(Minecraft_MCPE_S905)
+        
+        set(CMAKE_CXX_STANDARD 11)
+        set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv7-a -mfpu=neon -mtune=cortex-a9")
+        
+        include_directories(
+            ${CMAKE_CURRENT_SOURCE_DIR}/lib/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+        )
+        
+        set(SOURCES
+            src/client/renderer/Shader.cpp
+            src/client/renderer/GLESLoader.cpp
+            src/client/renderer/LevelRenderer.cpp
+        )
+        
+        add_executable(minecraft_s905 src/main_emuelec_s905.h ${SOURCES})
+        target_link_libraries(minecraft_s905 SDL png EGL GLESv2 m)
+        EOF
+
+    - name: Build for S905
+      run: |
+        mkdir -p handheld/build
+        cd handheld/build
+        cmake -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_SYSTEM_NAME=Linux \
+              -DCMAKE_SYSTEM_PROCESSOR=armv7l \
+              -DCMAKE_C_COMPILER=arm-linux-gnueabihf-gcc \
+              -DCMAKE_CXX_COMPILER=arm-linux-gnueabihf-g++ \
+              ..
+        make -j$(nproc)
+
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: minecraft_s905-${{ github.sha }}
+        path: handheld/build/minecraft_s905
+        retention-days: 30
+
+    - name: Create Release on Tag
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: handheld/build/minecraft_s905
+        body: "Minecraft Pi Edition - EmuELEC S905 Mali GPU Port"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
