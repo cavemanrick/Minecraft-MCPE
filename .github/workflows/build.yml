@@ -13,7 +13,7 @@ jobs:
     name: ARM S905 Cross-Compile
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Install ARM cross-compile toolchain
       run: |
@@ -71,7 +71,7 @@ jobs:
         make -j$(nproc)
 
     - name: Upload build artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: minecraft_s905-${{ github.sha }}
         path: handheld/build/minecraft_s905
